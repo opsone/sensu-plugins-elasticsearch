@@ -1,2 +1,3 @@
-/assets/
-/Gemfile.lock
+dist/
+/check-elasticsearch-status
+/integration/check-elasticsearch-status
