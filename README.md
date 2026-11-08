@@ -67,25 +67,30 @@ check-elasticsearch-status -H 127.0.0.1 -p 9200
 check-elasticsearch-status -H 127.0.0.1 -p 9200 -s -k -u sensu   # password in CHECK_ELASTICSEARCH_PASSWORD
 ```
 
-## Check definition
+## Check definitions
 
 Every option is passed through `env_vars`, filled per host from entity annotations with token substitution (applied by the agent to the whole check definition, `env_vars` included). One annotation maps to one option.
 
 Naming rule: an annotation is named after its environment variable, lowercased, without the `CHECK_` prefix (`CHECK_ELASTICSEARCH_HOST` → `elasticsearch_host`).
 
-Every annotation is optional: the check definition holds the defaults. An empty variable is ignored and the option keeps its default value.
+- Optional options get an explicit, non-empty `default`, matching the plugin default. Never use `| default ""`, nor an annotation set to an empty value: Sensu rejects an empty environment variable (`FOO=`), and the agent then silently drops the check, without any event.
+- `elasticsearch_user` and `elasticsearch_password` have no default, as no non-empty value means "no authentication". They only appear in the `check-elasticsearch-status-auth` definition, where an entity missing them gets an error event (unmatched token). Clusters without security use `check-elasticsearch-status`, which has no credential line.
+- Each host subscribes to one of the two definitions: `elasticsearch` (no authentication) or `elasticsearch-auth`.
 
 Annotations, e.g. in the agent configuration (`/etc/sensu/agent.yml`):
 
 ```yaml
 annotations:
-  elasticsearch_host: 127.0.0.1        # default 127.0.0.1
-  elasticsearch_port: "9200"           # default 9200
-  elasticsearch_https: "true"          # Elasticsearch 8+ defaults
-  elasticsearch_insecure: "true"
-  elasticsearch_user: sensu
-  elasticsearch_password: secret
+  elasticsearch_host: 127.0.0.1        # optional, default 127.0.0.1
+  elasticsearch_port: "9200"           # optional, default 9200
+  elasticsearch_https: "true"          # optional, default false (true on Elasticsearch 8+)
+  elasticsearch_insecure: "true"       # optional, default false (true with the self-signed certificate of Elasticsearch 8+)
+  elasticsearch_timeout: "5"           # optional, seconds, default 10
+  elasticsearch_user: sensu            # required by check-elasticsearch-status-auth
+  elasticsearch_password: secret       # required by check-elasticsearch-status-auth
 ```
+
+### Without authentication
 
 ```yaml
 ---
@@ -98,11 +103,9 @@ spec:
   env_vars:
     - CHECK_ELASTICSEARCH_HOST={{ .annotations.elasticsearch_host | default "127.0.0.1" }}
     - CHECK_ELASTICSEARCH_PORT={{ .annotations.elasticsearch_port | default "9200" }}
-    - CHECK_ELASTICSEARCH_USER={{ .annotations.elasticsearch_user | default "" }}
-    - CHECK_ELASTICSEARCH_PASSWORD={{ .annotations.elasticsearch_password | default "" }}
-    - CHECK_ELASTICSEARCH_HTTPS={{ .annotations.elasticsearch_https | default "" }}
-    - CHECK_ELASTICSEARCH_INSECURE={{ .annotations.elasticsearch_insecure | default "" }}
-    - CHECK_ELASTICSEARCH_TIMEOUT={{ .annotations.elasticsearch_timeout | default "" }}
+    - CHECK_ELASTICSEARCH_HTTPS={{ .annotations.elasticsearch_https | default "false" }}
+    - CHECK_ELASTICSEARCH_INSECURE={{ .annotations.elasticsearch_insecure | default "false" }}
+    - CHECK_ELASTICSEARCH_TIMEOUT={{ .annotations.elasticsearch_timeout | default "10" }}
   runtime_assets:
     - opsone/sensu-plugins-elasticsearch
   interval: 60
@@ -110,6 +113,33 @@ spec:
   publish: true
   subscriptions:
     - elasticsearch
+```
+
+### With authentication (Elasticsearch 8+ security)
+
+```yaml
+---
+type: CheckConfig
+api_version: core/v2
+metadata:
+  name: check-elasticsearch-status-auth
+spec:
+  command: check-elasticsearch-status
+  env_vars:
+    - CHECK_ELASTICSEARCH_HOST={{ .annotations.elasticsearch_host | default "127.0.0.1" }}
+    - CHECK_ELASTICSEARCH_PORT={{ .annotations.elasticsearch_port | default "9200" }}
+    - CHECK_ELASTICSEARCH_HTTPS={{ .annotations.elasticsearch_https | default "false" }}
+    - CHECK_ELASTICSEARCH_INSECURE={{ .annotations.elasticsearch_insecure | default "false" }}
+    - CHECK_ELASTICSEARCH_TIMEOUT={{ .annotations.elasticsearch_timeout | default "10" }}
+    - CHECK_ELASTICSEARCH_USER={{ .annotations.elasticsearch_user }}
+    - CHECK_ELASTICSEARCH_PASSWORD={{ .annotations.elasticsearch_password }}
+  runtime_assets:
+    - opsone/sensu-plugins-elasticsearch
+  interval: 60
+  timeout: 30
+  publish: true
+  subscriptions:
+    - elasticsearch-auth
 ```
 
 Entity annotations are visible in the Sensu dashboard and API: to keep the password out of them, use Sensu [secrets](https://docs.sensu.io/sensu-go/latest/operations/manage-secrets/secrets/) instead of `env_vars` for `CHECK_ELASTICSEARCH_PASSWORD`.
