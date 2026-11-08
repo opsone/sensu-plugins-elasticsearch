@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.1] - 2026-11-08
 
 ### Fixed
 - README: check definitions no longer use `| default ""`. Sensu rejects an empty environment variable, and the agent silently drops the check on a host missing the annotation. Explicit defaults instead (`false`, `false`, `10`); credentials move to a dedicated `check-elasticsearch-status-auth` definition (subscription `elasticsearch-auth`) where `elasticsearch_user` and `elasticsearch_password` are required.
