@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs check-elasticsearch-status against a real Elasticsearch (single node, security and
+# Runs the checks against a real Elasticsearch (single node, security and
 # HTTPS auto-configured, like a default 8+/9+ install) in Docker.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -21,7 +21,7 @@ cleanup() {
 trap cleanup EXIT
 
 docker run -d --name "$eshost" --network "$network" -m 1g \
-  -e discovery.type=single-node -e ELASTIC_PASSWORD="$password" \
+  -e discovery.type=single-node -e node.name=es-1 -e ELASTIC_PASSWORD="$password" \
   -e ES_JAVA_OPTS="-Xms512m -Xmx512m" -e cluster.routing.allocation.disk.threshold_enabled=false \
   "$es_image" >/dev/null
 docker run -d --name "$runner" --network "$network" "$image" >/dev/null
@@ -71,6 +71,23 @@ expect 1 "not a health response (200)" check-elasticsearch-status -H 127.0.0.1 -
 expect 1 "not found (404)" check-elasticsearch-status -H 127.0.0.1 -p 8081
 expect 2 "connection refused" check-elasticsearch-status -H 127.0.0.1 -p 1
 expect 2 "unreachable host (timeout)" check-elasticsearch-status -H 192.0.2.1 -p 9200 --timeout 1
+
+# JVM memory pressure of the 512 MB heap: thresholds lowered to force WARNING and CRITICAL.
+heapargs=(check-elasticsearch-heap -H "$eshost" -p 9200 -s -k -u elastic -P "$password")
+expect 3 "heap without host" check-elasticsearch-heap -p 9200
+expect 3 "heap warning above critical" "${heapargs[@]}" -w 90 -c 80
+expect 3 "heap critical above 100" "${heapargs[@]}" -c 101
+expect 3 "heap empty node specification" "${heapargs[@]}" -n ""
+expect 0 "heap local node, default thresholds" "${heapargs[@]}"
+expect 0 "heap all nodes" "${heapargs[@]}" -n _all
+expect 0 "heap node by name" "${heapargs[@]}" -n es-1,nope
+expect 1 "heap warning" "${heapargs[@]}" -w 1 -c 100
+expect 2 "heap critical" "${heapargs[@]}" -w 1 -c 1
+expect 1 "heap warning, thresholds from env" env CHECK_ELASTICSEARCH_HEAP_WARNING=1 CHECK_ELASTICSEARCH_HEAP_CRITICAL=100 "${heapargs[@]}"
+expect 1 "heap unknown node" "${heapargs[@]}" -n nope
+expect 1 "heap no monitor privilege (403)" "${heapargs[@]}" -u nopriv -P nopriv-secret
+expect 1 "heap not found (404)" check-elasticsearch-heap -H 127.0.0.1 -p 8081
+expect 2 "heap connection refused" check-elasticsearch-heap -H 127.0.0.1 -p 1
 
 # Yellow: a replica that cannot be allocated on a single node.
 es -X PUT "https://$eshost:9200/yellow" -d '{"settings":{"number_of_shards":1,"number_of_replicas":1}}'

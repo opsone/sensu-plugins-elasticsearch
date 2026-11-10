@@ -1,5 +1,5 @@
-BINARY  := check-elasticsearch-status
-PROJECT := sensu-plugins-elasticsearch
+BINARIES := check-elasticsearch-status check-elasticsearch-heap
+PROJECT  := sensu-plugins-elasticsearch
 VERSION ?= $(patsubst v%,%,$(shell git describe --tags --always 2>/dev/null || echo dev))
 COMMIT  := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -19,20 +19,20 @@ test:
 	go test ./...
 
 build:
-	go build -o $(BINARY) .
+	go build -o . ./cmd/...
 
 linux:
-	GOOS=linux GOARCH=$(shell go env GOARCH) CGO_ENABLED=0 go build -o integration/$(BINARY) .
+	GOOS=linux GOARCH=$(shell go env GOARCH) CGO_ENABLED=0 go build -o integration/ ./cmd/...
 
 integration: linux
 	./integration/run.sh
 
-# Sensu assets: one tar.gz per arch with bin/check-elasticsearch-status, plus a sha512 checksums file.
+# Sensu assets: one tar.gz per arch with bin/check-elasticsearch-*, plus a sha512 checksums file.
 dist: test
 	rm -rf dist
 	set -e; for arch in $(ARCHS); do \
 		dir=dist/$(PROJECT)_$(VERSION)_linux_$$arch; \
-		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $$dir/bin/$(BINARY) .; \
+		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $$dir/bin/ ./cmd/...; \
 		cp README.md CHANGELOG.md $$dir/; \
 		COPYFILE_DISABLE=1 tar -czf $$dir.tar.gz -C $$dir bin README.md CHANGELOG.md; \
 		rm -rf $$dir; \
@@ -48,5 +48,5 @@ release: dist
 		dist/*.tar.gz dist/*_sha512-checksums.txt
 
 clean:
-	rm -f $(BINARY) integration/$(BINARY)
+	rm -f $(BINARIES) $(addprefix integration/,$(BINARIES))
 	rm -rf dist

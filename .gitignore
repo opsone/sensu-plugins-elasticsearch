@@ -1,3 +1,11 @@
-dist/
-/check-elasticsearch-status
-/integration/check-elasticsearch-status
+# Build outputs (make build / linux / dist)
+/dist/
+/check-elasticsearch-*
+/integration/check-elasticsearch-*
+
+# Manual `go build` from a cmd/ directory
+/cmd/*/check-elasticsearch-*
+
+# go test -c, coverage
+*.test
+*.out

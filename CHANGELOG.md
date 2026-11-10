@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- `check-elasticsearch-heap`: JVM memory pressure (old generation usage) of the local node, or of the nodes selected by `--nodes`, against `--warning` (75 %) and `--critical` (85 %). Same connection options as `check-elasticsearch-status`; `check-elasticsearch-heap` and `check-elasticsearch-heap-auth` definitions in the README.
+
+### Changed
+- One binary per check under `cmd/`, connection and HTTP handling shared in `internal/elasticsearch`. The asset ships both binaries.
+- HTTP 3xx / 401 / 403 / 404 messages read `API endpoint misconfigured` instead of `health endpoint misconfigured` (states unchanged).
+
 ## [0.2.1] - 2026-11-08
 
 ### Fixed
