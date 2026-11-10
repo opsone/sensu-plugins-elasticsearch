@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] - 2026-11-10
 
 ### Added
 - `check-elasticsearch-heap`: JVM memory pressure (old generation usage) of the local node, or of the nodes selected by `--nodes`, against `--warning` (75 %) and `--critical` (85 %). Same connection options as `check-elasticsearch-status`; `check-elasticsearch-heap` and `check-elasticsearch-heap-auth` definitions in the README.
